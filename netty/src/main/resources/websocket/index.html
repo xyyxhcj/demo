@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <title>websocket netty demo</title>
+</head>
+<body>
+<div id="app">
+    <label>
+        userId:
+        <input v-model="userId" :disabled="isLogin"/>
+    </label>
+    <button v-if="!isLogin" @click="login">登录</button>
+    <button v-if="isLogin" @click="loginOut">注销</button>
+    <div v-if="isLogin">
+        <label>
+            sendTo:
+            <input v-model="sendTo"/>
+        </label>
+        <br/>
+        <label>
+            message:
+            <input v-model="msg"/>
+        </label>
+        <button @click="send">send</button>
+        <pre>{{respMsg}}</pre>
+    </div>
+</div>
+<script>
+    let app = new Vue({
+        el: '#app',
+        data: {
+            userId: '',
+            isLogin: false,
+            sendTo: '',
+            msg: '',
+            socket: undefined,
+            respMsg: ''
+        },
+        methods: {
+            login() {
+                if (this.userId === '') {
+                    return;
+                }
+                if (!window.WebSocket) {
+                    alert('浏览器不支付websocket协议');
+                    return;
+                }
+                this.socket = new WebSocket("ws://127.0.0.1:8089/ws");
+                this.socket.onmessage = (e) => {
+                    console.log('respMsg: {}', e.data);
+                    this.respMsg += e.data + '\r\n';
+                };
+                this.socket.onopen = () => {
+                    console.log('open');
+                };
+                this.socket.onerror = () => {
+                    console.log('error');
+                };
+                this.socket.onclose = () => {
+                    console.log('close');
+                };
+                this.sendMsg(JSON.stringify({
+                    'type': '1',
+                    'userId': this.userId,
+                }));
+                this.isLogin = true;
+            },
+            loginOut() {
+                this.sendMsg(JSON.stringify({
+                    'type': '-1',
+                    'userId': this.userId,
+                }));
+                this.socket.close();
+                this.isLogin = false;
+            },
+            send() {
+                if (this.msg === '') {
+                    return;
+                }
+                this.sendMsg(JSON.stringify({
+                    'userId': this.userId,
+                    'sendTo': this.sendTo,
+                    'msg': this.msg,
+                }));
+            },
+            sendMsg(msg, func) {
+                this.waitForConnection(() => {
+                    this.socket.send(msg);
+                    if (func) {
+                        // 如果传入回调,则执行回调
+                        func();
+                    }
+                }, 1000);
+            },
+            waitForConnection(func, interval) {
+                if (this.socket.readyState === 1) {
+                    func();
+                } else {
+                    let that = this;
+                    setTimeout(() => that.waitForConnection(func, interval), interval);
+                }
+            }
+        },
+    })
+</script>
+</body>
+</html>
